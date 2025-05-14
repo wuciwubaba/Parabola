@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抛射体射程与角度关系</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#F59E0B',
+                        dark: '#1E293B',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+            .transition-all-300 {
+                transition: all 300ms ease-in-out;
+            }
+            .input-slider-container {
+                display: grid;
+                grid-template-columns: 1fr 80px;
+                gap: 10px;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- 标题区域 -->
+        <div class="text-center mb-10">
+            <h1 class="text-[clamp(2rem,5vw,3rem)] font-bold text-dark mb-4">抛射体射程与角度关系</h1>
+            <p class="text-gray-600 text-lg max-w-3xl mx-auto">探索不同抛射角度下，初速度和重力加速度对抛射体射程的影响</p>
+        </div>
+
+        <!-- 控制面板 -->
+        <div class="bg-white rounded-xl p-6 shadow-lg mb-8 card-shadow">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">初速度 (m/s)</label>
+                        <div class="input-slider-container">
+                            <input type="range" id="velocity-slider" min="10" max="100" step="0.1" value="56.2" 
+                                class="h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary">
+                            <input type="number" id="velocity-input" min="10" max="100" step="0.1" value="56.2" 
+                                class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">重力加速度 (m/s²)</label>
+                        <div class="input-slider-container">
+                            <input type="range" id="gravity-slider" min="1" max="20" step="0.01" value="9.81" 
+                                class="h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-secondary">
+                            <input type="number" id="gravity-input" min="1" max="20" step="0.01" value="9.81" 
+                                class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-secondary focus:border-secondary">
+                        </div>
+                    </div>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="bg-gray-50 rounded-lg p-4 h-full flex flex-col justify-center">
+                        <h3 class="text-lg font-medium text-gray-800 mb-2">当前参数下的最大射程</h3>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">角度</p>
+                                <p id="max-angle" class="text-2xl font-bold text-primary">45.0°</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">射程</p>
+                                <p id="max-range" class="text-2xl font-bold text-secondary">321.96 m</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">飞行时间</p>
+                                <p id="flight-time" class="text-2xl font-bold text-accent">8.10 s</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图表区域（仅保留射程图表） -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div class="lg:col-span-3 bg-white rounded-xl p-6 shadow-lg card-shadow"> <!-- 从col-span-2改为col-span-3 -->
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">射程与角度关系图</h2>
+                <div class="h-[600px]"> <!-- 高度从400px增加到600px -->
+                    <canvas id="rangeChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="bg-white rounded-xl p-6 shadow-lg card-shadow mb-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">关键角度射程数据</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">抛射角度 (°)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">射程 (m)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最大高度 (m)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">飞行时间 (s)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="data-table">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 公式说明 -->
+        <div class="bg-blue-50 rounded-xl p-6 shadow-lg card-shadow">
+            <h2 class="text-xl font-semibold text-blue-800 mb-4 flex items-center">
+                <i class="fa fa-formula mr-2"></i> 射程公式说明
+            </h2>
+            <div class="space-y-4 text-gray-700">
+                <p>抛射体在理想状态下（忽略空气阻力）的射程公式为：</p>
+                <div class="bg-white p-4 rounded-lg shadow-sm inline-block">
+                    <p class="text-lg font-medium">R = (v₀² · sin(2α)) / g</p>
+                </div>
+                <p>其中：</p>
+                <ul class="list-disc pl-5 space-y-1">
+                    <li>R 是射程（水平距离）</li>
+                    <li>v₀ 是初速度</li>
+                    <li>α 是抛射角度</li>
+                    <li>g 是重力加速度</li>
+                </ul>
+                <p>当抛射角度为 45° 时，sin(2α) = sin(90°) = 1，此时射程达到最大值 R_max = v₀² / g。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始参数
+        let velocity = 56.2; 
+        let gravity = 9.81;   
+        
+        // 创建射程图表
+        const rangeCtx = document.getElementById('rangeChart').getContext('2d');
+        const rangeChart = new Chart(rangeCtx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 91}, (_, i) => i),
+                datasets: [{
+                    label: '射程 (m)',
+                    data: calculateRangeData(),
+                    borderColor: '#3B82F6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: '#3B82F6',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                return `射程: ${context.raw.toFixed(2)} m`;
+                            }
+                        }
+                    },
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '抛射角度 (°)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        min: 0,
+                        max: 90,
+                        ticks: {
+                            stepSize: 10
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: '射程 (m)',
+                            font: {
+                                weight: 'bold'
+                            }
+                        },
+                        beginAtZero: true,
+                        suggestedMax: calculateMaxRange() * 1.1 // 根据当前参数动态调整Y轴最大值
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                },
+                animation: {
+                    duration: 1000,
+                    easing: 'easeOutQuart'
+                }
+            }
+        });
+
+        // 计算最大射程
+        function calculateMaxRange() {
+            return (velocity ** 2) / gravity;
+        }
+
+        // 计算射程数据
+        function calculateRangeData() {
+            return Array.from({length: 91}, (_, i) => {
+                const angle = i * Math.PI / 180; 
+                return (velocity ** 2 * Math.sin(2 * angle)) / gravity;
+            });
+        }
+
+        // 更新表格数据
+        function updateTableData() {
+            const angles = [15, 30, 45, 60, 75];
+            const tableBody = document.getElementById('data-table');
+            tableBody.innerHTML = '';
+            
+            angles.forEach(angle => {
+                const angleRadians = angle * Math.PI / 180;
+                const range = (velocity ** 2 * Math.sin(2 * angleRadians)) / gravity;
+                const maxHeight = (velocity ** 2 * Math.sin(angleRadians) ** 2) / (2 * gravity);
+                const time = (2 * velocity * Math.sin(angleRadians)) / gravity;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${angle}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${range.toFixed(2)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${maxHeight.toFixed(2)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${time.toFixed(2)}</div>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // 更新最大射程信息
+        function updateMaxRangeInfo() {
+            const maxRange = (velocity ** 2) / gravity;
+            const maxAngle = 45;
+            const timeOfFlight = (2 * velocity * Math.sin(maxAngle * Math.PI / 180)) / gravity;
+            
+            document.getElementById('max-range').textContent = `${maxRange.toFixed(2)} m`;
+            document.getElementById('max-angle').textContent = `${maxAngle.toFixed(1)}°`;
+            document.getElementById('flight-time').textContent = `${timeOfFlight.toFixed(2)} s`;
+        }
+
+        // 事件监听器 - 滑块控制
+        document.getElementById('velocity-slider').addEventListener('input', function(e) {
+            const value = parseFloat(e.target.value);
+            document.getElementById('velocity-input').value = value;
+            velocity = value;
+            updateChartsAndInfo();
+        });
+
+        document.getElementById('gravity-slider').addEventListener('input', function(e) {
+            const value = parseFloat(e.target.value);
+            document.getElementById('gravity-input').value = value;
+            gravity = value;
+            updateChartsAndInfo();
+        });
+
+        // 事件监听器 - 输入框控制
+        document.getElementById('velocity-input').addEventListener('change', function(e) {
+            const value = parseFloat(e.target.value);
+            if (!isNaN(value) && value >= 10 && value <= 100) {
+                document.getElementById('velocity-slider').value = value;
+                velocity = value;
+                updateChartsAndInfo();
+            } else {
+                alert('请输入10-100之间的初速度值');
+                e.target.value = velocity;
+            }
+        });
+
+        document.getElementById('gravity-input').addEventListener('change', function(e) {
+            const value = parseFloat(e.target.value);
+            if (!isNaN(value) && value >= 1 && value <= 20) {
+                document.getElementById('gravity-slider').value = value;
+                gravity = value;
+                updateChartsAndInfo();
+            } else {
+                alert('请输入1-20之间的重力加速度值');
+                e.target.value = gravity;
+            }
+        });
+
+        // 更新图表和信息
+        function updateChartsAndInfo() {
+            rangeChart.data.datasets[0].data = calculateRangeData();
+            rangeChart.options.scales.y.suggestedMax = calculateMaxRange() * 1.1; // 更新Y轴最大值
+            rangeChart.update();
+            updateMaxRangeInfo();
+            updateTableData();
+        }
+
+        // 初始化表格数据
+        updateTableData();
+    </script>
+</body>
+</html>    
